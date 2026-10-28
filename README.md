@@ -9,12 +9,11 @@ Port no oficial a NeoForge 1.21.1 de [Serious Player Animations](https://github.
 - [playerAnimator](https://modrinth.com/mod/playeranimator) 2.0.x (NeoForge)
 - [Cloth Config](https://modrinth.com/mod/cloth-config) 15.x (NeoForge)
 
-No necesita Fabric API, Forgified Fabric API ni Sinytra Connector: es un mod nativo de NeoForge.
 
 ### Notas
 
 - **Solo cliente.** No hace nada en servidores y no te impide entrar a uno.
-- **Configuración:** menú Mods → Serious Player Animations → Config.
+- **Configuración:** menú Mods - Serious Player Animations - Config.
 - **Resource packs** hechos para Serious Player Animations funcionan. Las animaciones se cargan al entrar al mundo, así que vuelve a entrar después de cambiar packs.
 - **Compatibilidad que se mantiene:** Not Enough Animations, Carry On, Supplementaries (flauta), Immersive Melodies, Sword Blocking.
 - **Compatibilidad eliminada:** Ultracraft, Old Combat Mod y Trigger Happy (solo existen en Fabric). Paraglider no tiene versión NeoForge 1.21.1.
