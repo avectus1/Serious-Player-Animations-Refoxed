@@ -1,42 +1,4 @@
-# Serious Player Animations - NeoForge 1.21.1 Port
 
-Unofficial NeoForge 1.21.1 port of [Serious Player Animations](https://github.com/McVader34/Serious-Player-Animations) by **McVader**: smooth third-person player animations, powered by playerAnimator.
-
-*[Español abajo](#español)*
-
-## Requirements
-
-- Minecraft 1.21.1
-- NeoForge 21.1.x
-- [playerAnimator](https://modrinth.com/mod/playeranimator) 2.0.x (NeoForge)
-- [Cloth Config](https://modrinth.com/mod/cloth-config) 15.x (NeoForge)
-
-No Fabric API, Forgified Fabric API or Sinytra Connector needed, this is a native NeoForge mod.
-
-## Notes
-
-- **Client-side only.** It does nothing on servers and won't block you from joining one.
-- **Config:** Mods menu → Serious Player Animations → Config.
-- **Resource packs** made for Serious Player Animations work. Animations are loaded when your player joins a world, so rejoin after changing packs.
-- **Compatibility kept:** Not Enough Animations, Carry On, Supplementaries (flute), Immersive Melodies, Sword Blocking.
-- **Compatibility removed:** Ultracraft, Old Combat Mod and Trigger Happy (Fabric-only). Paraglider has no NeoForge 1.21.1 version.
-- Based on the 1.2.0 alpha for Fabric, so any issues from that alpha may carry over.
-
-## Building
-
-```
-./gradlew build
-```
-
-The jar is written to `build/libs/`.
-
-## Credits & license
-
-All animations and original code by **McVader** ([original repo](https://github.com/McVader34/Serious-Player-Animations)). This port is not affiliated with or endorsed by the original author. Licensed under MIT — see [LICENSE](LICENSE).
-
----
-
-## Español
 
 Port no oficial a NeoForge 1.21.1 de [Serious Player Animations](https://github.com/McVader34/Serious-Player-Animations) de **McVader**: animaciones fluidas del jugador en tercera persona, usando playerAnimator.
 
