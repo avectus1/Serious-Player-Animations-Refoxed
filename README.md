@@ -1,4 +1,4 @@
-# Serious Player Animations — NeoForge 1.21.1 Port
+# Serious Player Animations - NeoForge 1.21.1 Port
 
 Unofficial NeoForge 1.21.1 port of [Serious Player Animations](https://github.com/McVader34/Serious-Player-Animations) by **McVader**: smooth third-person player animations, powered by playerAnimator.
 
@@ -11,7 +11,7 @@ Unofficial NeoForge 1.21.1 port of [Serious Player Animations](https://github.co
 - [playerAnimator](https://modrinth.com/mod/playeranimator) 2.0.x (NeoForge)
 - [Cloth Config](https://modrinth.com/mod/cloth-config) 15.x (NeoForge)
 
-No Fabric API, Forgified Fabric API or Sinytra Connector needed — this is a native NeoForge mod.
+No Fabric API, Forgified Fabric API or Sinytra Connector needed, this is a native NeoForge mod.
 
 ## Notes
 
