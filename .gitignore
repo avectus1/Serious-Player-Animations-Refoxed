@@ -1,0 +1,9 @@
+.gradle/
+build/
+run/
+out/
+*.log
+.idea/
+*.iml
+.vscode/
+bin/

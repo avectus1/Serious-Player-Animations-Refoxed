@@ -1,0 +1,44 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="MIT"
+issueTrackerURL="https://github.com/McVader34/Serious-Player-Animations/issues"
+
+[[mods]]
+modId="seriousplayeranimations"
+version="1.2.0-neoforge"
+displayName="Serious Player Animations"
+authors="McVader (NeoForge port)"
+description='''A client side mod that adds cool animations to the player.'''
+logoFile="assets/seriousplayeranimations/icon.png"
+displayURL="https://github.com/McVader34/Serious-Player-Animations"
+
+[[mixins]]
+config="seriousplayeranimations.mixins.json"
+
+[[dependencies.seriousplayeranimations]]
+modId="neoforge"
+type="required"
+versionRange="[21.1,)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.seriousplayeranimations]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1,1.21.2)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.seriousplayeranimations]]
+modId="playeranimator"
+type="required"
+versionRange="[2.0,)"
+ordering="AFTER"
+side="CLIENT"
+
+[[dependencies.seriousplayeranimations]]
+modId="cloth_config"
+type="required"
+versionRange="[15,)"
+ordering="NONE"
+side="CLIENT"
