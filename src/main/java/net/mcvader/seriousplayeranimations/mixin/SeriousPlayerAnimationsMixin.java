@@ -10,6 +10,7 @@ import dev.kosmx.playerAnim.api.layered.modifier.AdjustmentModifier;
 import dev.kosmx.playerAnim.api.layered.modifier.MirrorModifier;
 import dev.kosmx.playerAnim.api.layered.modifier.SpeedModifier;
 import dev.kosmx.playerAnim.api.layered.modifier.AdjustmentModifier.PartModifier;
+import dev.kosmx.playerAnim.core.data.AnimationFormat;
 import dev.kosmx.playerAnim.core.data.KeyframeAnimation;
 import dev.kosmx.playerAnim.core.data.KeyframeAnimation.AnimationBuilder;
 import dev.kosmx.playerAnim.core.data.KeyframeAnimation.StateCollection;
@@ -17,7 +18,10 @@ import dev.kosmx.playerAnim.core.util.Ease;
 import dev.kosmx.playerAnim.core.util.Vec3f;
 import dev.kosmx.playerAnim.minecraftApi.PlayerAnimationAccess;
 import dev.kosmx.playerAnim.minecraftApi.PlayerAnimationRegistry;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Objects;
+import java.util.Set;
 import java.util.Optional;
 import net.mcvader.seriousplayeranimations.IExampleAnimatedPlayer;
 import net.mcvader.seriousplayeranimations.SeriousPlayerAnimations;
@@ -54,6 +58,9 @@ import net.minecraft.world.item.TridentItem;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.LadderBlock;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.block.VineBlock;
@@ -71,7 +78,6 @@ import net.minecraft.world.item.InstrumentItem;
 import net.minecraft.world.item.BrushItem;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.client.model.HumanoidModel.ArmPose;
-import org.joml.Vector3f;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -187,8 +193,6 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
    boolean swordSeq = true;
    String modifyId = "";
    String prevModifyId = "";
-   String blockStateString = "";
-   String boatString = "";
    int flychecker = 0;
    double vyfly = 0.0;
    boolean isMovingBackwards = false;
@@ -303,83 +307,143 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       return this.torsoRotation;
    }
 
+   // Shared cache of animations with arms masked out, so they are built once instead of every tick.
+   @Unique
+   private static final IdentityHashMap<KeyframeAnimation, KeyframeAnimation[]> SPA_MASK_CACHE = new IdentityHashMap<>();
+   @Unique
+   private static KeyframeAnimation spa$emptyAnimation = null;
+   @Unique
+   private static final Set<String> SPA_MISSING_WARNED = new HashSet<>();
+   @Unique
+   private Object spa$registryMarker = null;
+   @Unique
+   private boolean spa$loaded = false;
+
+   @Unique
+   private KeyframeAnimation spa$load(String name) {
+      if (PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", name)) instanceof KeyframeAnimation anim) {
+         return anim;
+      }
+      // Missing or broken (e.g. a resource pack with an invalid file): use an empty animation instead of crashing.
+      if (SPA_MISSING_WARNED.add(name)) {
+         SeriousPlayerAnimations.LOGGER.warn("Animation seriousplayeranimations:{} is missing or failed to load, using an empty animation", name);
+      }
+      if (spa$emptyAnimation == null) {
+         AnimationBuilder empty = new AnimationBuilder(AnimationFormat.JSON_EMOTECRAFT);
+         empty.endTick = 20;
+         empty.isLooped = true;
+         empty.returnTick = 0;
+         spa$emptyAnimation = empty.build();
+      }
+      return spa$emptyAnimation;
+   }
+
+   // Animations are re-read when resource packs reload, so packs apply without rejoining the world.
+   @Unique
+   private void spa$checkRegistryReload() {
+      Object marker = PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "idle_standing"));
+      if (!this.spa$loaded || marker != this.spa$registryMarker) {
+         this.spa$loaded = true;
+         this.spa$registryMarker = marker;
+         SPA_MASK_CACHE.clear();
+         SPA_MISSING_WARNED.clear();
+         this.reloadAnimationVariables();
+      }
+   }
+
+   // kind: 0 right arm rotation, 1 left arm rotation, 2 both arms rotation, 3 right arm position, 4 left arm position
+   @Unique
+   private static KeyframeAnimation spa$masked(KeyframeAnimation src, int kind) {
+      if (src == null) return null;
+      KeyframeAnimation[] variants = SPA_MASK_CACHE.computeIfAbsent(src, k -> new KeyframeAnimation[5]);
+      KeyframeAnimation result = variants[kind];
+      if (result == null) {
+         AnimationBuilder b = src.mutableCopy();
+         StateCollection rightArm = b.getPart("rightArm");
+         StateCollection leftArm = b.getPart("leftArm");
+         if ((kind == 0 || kind == 2) && rightArm != null) {
+            rightArm.pitch.setEnabled(false);
+            rightArm.yaw.setEnabled(false);
+            rightArm.roll.setEnabled(false);
+         }
+         if ((kind == 1 || kind == 2) && leftArm != null) {
+            leftArm.pitch.setEnabled(false);
+            leftArm.yaw.setEnabled(false);
+            leftArm.roll.setEnabled(false);
+         }
+         if (kind == 3 && rightArm != null) {
+            rightArm.x.setEnabled(false);
+            rightArm.y.setEnabled(false);
+            rightArm.z.setEnabled(false);
+         }
+         if (kind == 4 && leftArm != null) {
+            leftArm.x.setEnabled(false);
+            leftArm.y.setEnabled(false);
+            leftArm.z.setEnabled(false);
+         }
+         result = b.build();
+         variants[kind] = result;
+      }
+      return result;
+   }
+
    public void reloadAnimationVariables() {
-      this.sword_attack = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "sword_attack"));
-      this.sword_attack2 = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "sword_attack2"));
-      this.idle_standing = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "idle_standing"));
-      this.idle_creative_flying = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(
-         ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "idle_creative_flying")
-      );
-      this.idle_creative_flying_item = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(
-         ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "idle_creative_flying_item")
-      );
-      this.walking = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "walking"));
-      this.walking_backwards = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "walking_backwards"));
-      this.running = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "running"));
-      this.turn_left = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "turn_left"));
-      this.turn_right = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "turn_right"));
-      this.idle_sneak = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "idle_sneak"));
-      this.walking_sneak = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "walking_sneak"));
-      this.walking_sneak_backwards = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(
-         ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "walking_sneak_backwards")
-      );
-      this.sword_attack_sneak = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(
-         ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "sword_attack_sneak")
-      );
-      this.sword_attack_sneak2 = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(
-         ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "sword_attack_sneak2")
-      );
-      this.falling = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "falling"));
-      this.blank_loop = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "blank_loop"));
-      this.elytra = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "elytra"));
-      this.eating_right = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "eating_right"));
-      this.eating_left = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "eating_left"));
-      this.eating_right_sneak = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(
-         ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "eating_right_sneak")
-      );
-      this.eating_left_sneak = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "eating_left_sneak"));
-      this.idle_in_water = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "idle_in_water"));
-      this.forward_in_water = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "forward_in_water"));
-      this.backwards_in_water = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(
-         ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "backwards_in_water")
-      );
-      this.up_in_water = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "up_in_water"));
-      this.swimming = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "swimming"));
-      this.crawling = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "crawling"));
-      this.idle_crawling = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "idle_crawling"));
-      this.crawling_backwards = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(
-         ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "crawling_backwards")
-      );
-      this.climbing = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "climbing"));
-      this.climbing_sneak = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "climbing_sneak"));
-      this.idle_climbing = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "idle_climbing"));
-      this.idle_climbing_sneak = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(
-         ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "idle_climbing_sneak")
-      );
-      this.climbing_backwards = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(
-         ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "climbing_backwards")
-      );
-      this.pickaxe = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "pickaxe"));
-      this.pickaxe_sneak = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "pickaxe_sneak"));
-      this.minecart_idle = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "minecart_idle"));
-      this.minecart_pickaxe = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "minecart_pickaxe"));
-      this.horse_idle = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "horse_idle"));
-      this.horse_running = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "horse_running"));
-      this.horse_pickaxe = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "horse_pickaxe"));
-      this.boat1 = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "boat1"));
-      this.eating = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "eating"));
-      this.bow_idle = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "bow_idle"));
-      this.bow_sneak = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "bow_sneak"));
-      this.sleeping = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "sleeping"));
-      this.axe = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "axe"));
-      this.axe_sneak = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "axe_sneak"));
-      this.shovel = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "shovel"));
-      this.shovel_sneak = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "shovel_sneak"));
-      this.paraglider = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "paraglider"));
-      this.generic_handswing = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "generic_handswing"));
-      this.shield = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "shield"));
-      this.shield_sneak = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "shield_sneak"));
-      this.trident = (KeyframeAnimation)PlayerAnimationRegistry.getAnimation(ResourceLocation.fromNamespaceAndPath("seriousplayeranimations", "trident"));
+      this.sword_attack = this.spa$load("sword_attack");
+      this.sword_attack2 = this.spa$load("sword_attack2");
+      this.idle_standing = this.spa$load("idle_standing");
+      this.idle_creative_flying = this.spa$load("idle_creative_flying");
+      this.idle_creative_flying_item = this.spa$load("idle_creative_flying_item");
+      this.walking = this.spa$load("walking");
+      this.walking_backwards = this.spa$load("walking_backwards");
+      this.running = this.spa$load("running");
+      this.turn_left = this.spa$load("turn_left");
+      this.turn_right = this.spa$load("turn_right");
+      this.idle_sneak = this.spa$load("idle_sneak");
+      this.walking_sneak = this.spa$load("walking_sneak");
+      this.walking_sneak_backwards = this.spa$load("walking_sneak_backwards");
+      this.sword_attack_sneak = this.spa$load("sword_attack_sneak");
+      this.sword_attack_sneak2 = this.spa$load("sword_attack_sneak2");
+      this.falling = this.spa$load("falling");
+      this.blank_loop = this.spa$load("blank_loop");
+      this.elytra = this.spa$load("elytra");
+      this.eating_right = this.spa$load("eating_right");
+      this.eating_left = this.spa$load("eating_left");
+      this.eating_right_sneak = this.spa$load("eating_right_sneak");
+      this.eating_left_sneak = this.spa$load("eating_left_sneak");
+      this.idle_in_water = this.spa$load("idle_in_water");
+      this.forward_in_water = this.spa$load("forward_in_water");
+      this.backwards_in_water = this.spa$load("backwards_in_water");
+      this.up_in_water = this.spa$load("up_in_water");
+      this.swimming = this.spa$load("swimming");
+      this.crawling = this.spa$load("crawling");
+      this.idle_crawling = this.spa$load("idle_crawling");
+      this.crawling_backwards = this.spa$load("crawling_backwards");
+      this.climbing = this.spa$load("climbing");
+      this.climbing_sneak = this.spa$load("climbing_sneak");
+      this.idle_climbing = this.spa$load("idle_climbing");
+      this.idle_climbing_sneak = this.spa$load("idle_climbing_sneak");
+      this.climbing_backwards = this.spa$load("climbing_backwards");
+      this.pickaxe = this.spa$load("pickaxe");
+      this.pickaxe_sneak = this.spa$load("pickaxe_sneak");
+      this.minecart_idle = this.spa$load("minecart_idle");
+      this.minecart_pickaxe = this.spa$load("minecart_pickaxe");
+      this.horse_idle = this.spa$load("horse_idle");
+      this.horse_running = this.spa$load("horse_running");
+      this.horse_pickaxe = this.spa$load("horse_pickaxe");
+      this.boat1 = this.spa$load("boat1");
+      this.eating = this.spa$load("eating");
+      this.bow_idle = this.spa$load("bow_idle");
+      this.bow_sneak = this.spa$load("bow_sneak");
+      this.sleeping = this.spa$load("sleeping");
+      this.axe = this.spa$load("axe");
+      this.axe_sneak = this.spa$load("axe_sneak");
+      this.shovel = this.spa$load("shovel");
+      this.shovel_sneak = this.spa$load("shovel_sneak");
+      this.paraglider = this.spa$load("paraglider");
+      this.generic_handswing = this.spa$load("generic_handswing");
+      this.shield = this.spa$load("shield");
+      this.shield_sneak = this.spa$load("shield_sneak");
+      this.trident = this.spa$load("trident");
    }
 
    @Inject(
@@ -404,7 +468,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
          this.ParagliderModifier.enabled = false;
       }
 
-      this.reloadAnimationVariables();
+      this.spa$checkRegistryReload();
       this.currentAnimation = this.idle_standing;
       this.currentOverlay = this.blank_loop;
    }
@@ -460,116 +524,39 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
    }
 
    public void disableMainArm() {
-      this.builder = this.currentAnimation.mutableCopy();
-      StateCollection rightArm = this.builder.getPart("rightArm");
-
-      assert rightArm != null;
-
-      StateCollection leftArm = this.builder.getPart("leftArm");
-
-      assert leftArm != null;
-
       if (this.rightHand == InteractionHand.MAIN_HAND) {
-         rightArm.pitch.setEnabled(false);
-         rightArm.yaw.setEnabled(false);
-         rightArm.roll.setEnabled(false);
-         this.currentAnimation = this.builder.build();
+         this.currentAnimation = spa$masked(this.currentAnimation, 0);
       } else if (this.leftHand == InteractionHand.MAIN_HAND) {
-         leftArm.pitch.setEnabled(false);
-         leftArm.yaw.setEnabled(false);
-         leftArm.roll.setEnabled(false);
-         this.currentAnimation = this.builder.build();
+         this.currentAnimation = spa$masked(this.currentAnimation, 1);
       }
    }
 
    public void disableOffArm() {
-      this.builder = this.currentAnimation.mutableCopy();
-      StateCollection rightArm = this.builder.getPart("rightArm");
-
-      assert rightArm != null;
-
-      StateCollection leftArm = this.builder.getPart("leftArm");
-
-      assert leftArm != null;
-
       if (this.rightHand == InteractionHand.OFF_HAND) {
-         rightArm.pitch.setEnabled(false);
-         rightArm.yaw.setEnabled(false);
-         rightArm.roll.setEnabled(false);
-         this.currentAnimation = this.builder.build();
+         this.currentAnimation = spa$masked(this.currentAnimation, 0);
       } else if (this.leftHand == InteractionHand.OFF_HAND) {
-         leftArm.pitch.setEnabled(false);
-         leftArm.yaw.setEnabled(false);
-         leftArm.roll.setEnabled(false);
-         this.currentAnimation = this.builder.build();
+         this.currentAnimation = spa$masked(this.currentAnimation, 1);
       }
    }
 
    public void disableRightArm() {
-      this.builder = this.currentAnimation.mutableCopy();
-      StateCollection rightArm = this.builder.getPart("rightArm");
-
-      assert rightArm != null;
-
-      rightArm.pitch.setEnabled(false);
-      rightArm.yaw.setEnabled(false);
-      rightArm.roll.setEnabled(false);
-      this.currentAnimation = this.builder.build();
+      this.currentAnimation = spa$masked(this.currentAnimation, 0);
    }
 
    public void disableLeftArm() {
-      this.builder = this.currentAnimation.mutableCopy();
-      StateCollection leftArm = this.builder.getPart("leftArm");
-
-      assert leftArm != null;
-
-      leftArm.pitch.setEnabled(false);
-      leftArm.yaw.setEnabled(false);
-      leftArm.roll.setEnabled(false);
-      this.currentAnimation = this.builder.build();
+      this.currentAnimation = spa$masked(this.currentAnimation, 1);
    }
 
    public void disableBothArms() {
-      this.builder = this.currentAnimation.mutableCopy();
-      StateCollection rightArm = this.builder.getPart("rightArm");
-
-      assert rightArm != null;
-
-      StateCollection leftArm = this.builder.getPart("leftArm");
-
-      assert leftArm != null;
-
-      rightArm.pitch.setEnabled(false);
-      rightArm.yaw.setEnabled(false);
-      rightArm.roll.setEnabled(false);
-      leftArm.pitch.setEnabled(false);
-      leftArm.yaw.setEnabled(false);
-      leftArm.roll.setEnabled(false);
-      this.currentAnimation = this.builder.build();
+      this.currentAnimation = spa$masked(this.currentAnimation, 2);
    }
 
    public void disableRightArmOverlayPos() {
-      this.builder = this.currentAnimation.mutableCopy();
-      StateCollection rightArm = this.builder.getPart("rightArm");
-
-      assert rightArm != null;
-
-      rightArm.x.setEnabled(false);
-      rightArm.y.setEnabled(false);
-      rightArm.z.setEnabled(false);
-      this.currentAnimation = this.builder.build();
+      this.currentAnimation = spa$masked(this.currentAnimation, 3);
    }
 
    public void disableLeftArmOverlayPos() {
-      this.builder = this.currentAnimation.mutableCopy();
-      StateCollection leftArm = this.builder.getPart("leftArm");
-
-      assert leftArm != null;
-
-      leftArm.x.setEnabled(false);
-      leftArm.y.setEnabled(false);
-      leftArm.z.setEnabled(false);
-      this.currentAnimation = this.builder.build();
+      this.currentAnimation = spa$masked(this.currentAnimation, 4);
    }
 
    public void disableAnimation() {
@@ -623,7 +610,13 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       this.animate();
    }
 
+   @Unique
+   private static boolean spa$vineSide(BlockState state, BooleanProperty side) {
+      return state.hasProperty(side) && state.getValue(side);
+   }
+
    public void animate() {
+      this.spa$checkRegistryReload();
       this.animationTick++;
       if (this.getMainArm() == HumanoidArm.LEFT) {
          this.rightHand = InteractionHand.OFF_HAND;
@@ -644,9 +637,8 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       this.moveSpeed = Math.sqrt((double)(this.vx * this.vx + this.vz * this.vz));
       this.turn = this.byaw - this.prevbyaw;
       this.bodyYawRadians = Math.toRadians((double)(this.yBodyRot + 90.0F));
-      Vector3f movementVector = new Vector3f(this.vx, 0.0F, this.vz);
-      Vector3f lookVector = new Vector3f((float)Math.cos(this.bodyYawRadians), 0.0F, (float)Math.sin(this.bodyYawRadians));
-      this.isMovingBackwards = movementVector.length() > 0.0F && movementVector.dot(lookVector) < 0.0F;
+      this.isMovingBackwards = this.moveSpeed > 0.0
+         && this.vx * Math.cos(this.bodyYawRadians) + this.vz * Math.sin(this.bodyYawRadians) < 0.0;
       this.currentOverlay = this.blank_loop;
       this.currentOverlayId = "blank_loop";
       this.overlayFadeTime = 10;
@@ -750,7 +742,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       } else if (this.crouched && this.moveSpeed > 0.0 && !this.isMovingBackwards) {
          this.currentAnimation = this.walking_sneak;
          this.currentAnimationId = "walking_sneak";
-         if (!SeriousPlayerAnimations.config.getIdleSneaking().enabled) {
+         if (!SeriousPlayerAnimations.config.getWalkingSneak().enabled) {
             this.disableAnimation();
          }
 
@@ -827,22 +819,23 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       }
 
       if (!this.onGround() && !this.isPassenger()) {
-         Block block = this.clientLevel.getBlockState(this.blockPosition()).getBlock();
+         BlockState climbState = this.clientLevel.getBlockState(this.blockPosition());
+         Block block = climbState.getBlock();
          if (block instanceof LadderBlock || block instanceof VineBlock) {
             this.animationSpeed = 3.0F * SeriousPlayerAnimations.config.getClimbing().speedMultiplier;
             this.fadeTime = 7;
             this.priority = 0;
             if (!(this.getUseItem().getItem() instanceof BowItem)) {
-               this.blockStateString = String.valueOf(this.clientLevel.getBlockState(this.blockPosition()));
                this.byaw = this.getVisualRotationYInDegrees();
                this.hyaw = this.getYHeadRot();
-               if (this.blockStateString.contains("facing=north") || this.blockStateString.contains("south=true")) {
+               Direction facing = climbState.hasProperty(LadderBlock.FACING) ? climbState.getValue(LadderBlock.FACING) : null;
+               if (facing == Direction.NORTH || spa$vineSide(climbState, VineBlock.SOUTH)) {
                   this.byaw = 0.0F;
-               } else if (this.blockStateString.contains("facing=south") || this.blockStateString.contains("north=true")) {
+               } else if (facing == Direction.SOUTH || spa$vineSide(climbState, VineBlock.NORTH)) {
                   this.byaw = 180.0F;
-               } else if (this.blockStateString.contains("facing=west") || this.blockStateString.contains("east=true")) {
+               } else if (facing == Direction.WEST || spa$vineSide(climbState, VineBlock.EAST)) {
                   this.byaw = 270.0F;
-               } else if (this.blockStateString.contains("facing=east") || this.blockStateString.contains("west=true")) {
+               } else if (facing == Direction.EAST || spa$vineSide(climbState, VineBlock.WEST)) {
                   this.byaw = 90.0F;
                }
 
@@ -923,7 +916,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
          } else if (block instanceof PowderSnowBlock) {
             this.fadeTime = 7;
             this.priority = 0;
-            if (String.valueOf(this.getArmorSlots()).contains("leather_boots")) {
+            if (PowderSnowBlock.canEntityWalkOnPowderSnow(this)) {
                if (this.vy > 0.0F) {
                   if (this.crouched) {
                      this.currentAnimation = this.climbing_sneak;
@@ -1069,7 +1062,6 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
                this.fadeTime = 1;
                this.priority = 0;
             } else {
-               this.boatString = String.valueOf(this.getVehicle());
                this.currentAnimation = this.boat1;
                this.currentAnimationId = "boat1";
                if (!SeriousPlayerAnimations.config.getBoat().enabled) {
@@ -1336,10 +1328,8 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
             }
          } else if (this.activeItem instanceof CrossbowItem) {
             this.disableArms = true;
-         } else if (SeriousPlayerAnimations.SUPPLEMENTARIES_COMPAT) {
-            if (SupplementariesFluteCheck.check(this.activeItem)) {
-               this.disableArms = true;
-            }
+         } else if (SeriousPlayerAnimations.SUPPLEMENTARIES_COMPAT && SupplementariesFluteCheck.check(this.activeItem)) {
+            this.disableArms = true;
          } else {
             if (this.getUsedItemHand().equals(InteractionHand.MAIN_HAND)) {
                this.disableMainArmB = true;
@@ -1469,7 +1459,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
 
       if (this.disableOverlayB) {
          this.disableOverlay();
-         this.disableAnimationB = false;
+         this.disableOverlayB = false;
       }
 
       // Fantastic Wings: don't play walking/running/item animations while flying with wings
@@ -1495,7 +1485,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
          this.modified = true;
       }
 
-      this.lastPos = new Vec3(this.pos.x, this.pos.y, this.pos.z);
+      this.lastPos = this.pos;
       this.prevOnGround = this.onGround();
       this.prevbyaw = this.byaw;
       if (!Objects.equals(this.currentOverlayId, this.prevOverlayId) && this.overlayPriority >= this.prevOverlayPriority
