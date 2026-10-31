@@ -15,7 +15,7 @@ Port no oficial a NeoForge 1.21.1 de [Serious Player Animations](https://github.
 - **Solo cliente.** No hace nada en servidores y no te impide entrar a uno.
 - **Configuración:** menú Mods - Serious Player Animations - Config.
 - **Resource packs** hechos para Serious Player Animations funcionan. Las animaciones se cargan al entrar al mundo, así que vuelve a entrar después de cambiar packs.
-- **Compatibilidad que se mantiene:** Not Enough Animations, Carry On, Supplementaries (flauta), Immersive Melodies, Sword Blocking.
+- **Compatibilidad:** Not Enough Animations, Carry On, Supplementaries (flauta), Immersive Melodies, Sword Blocking y **Fantastic Wings** (nuevo en 1.3.0: ya no se reproducen las animaciones de caminar/correr mientras vuelas con alas).
 - **Compatibilidad eliminada:** Ultracraft, Old Combat Mod y Trigger Happy (solo existen en Fabric). Paraglider no tiene versión NeoForge 1.21.1.
 - Basado en la versión alpha 1.2.0 de Fabric, así que puede tener los mismos fallos que esa alpha.
 

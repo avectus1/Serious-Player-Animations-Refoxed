@@ -26,6 +26,7 @@ public class SeriousPlayerAnimations {
    public static boolean SWORDBLOCKING_COMPAT;
    public static boolean OLDCOMBATMOD_COMPAT;
    public static boolean TRIGGERHAPPY_COMPAT;
+   public static boolean FANTASTICWINGS_COMPAT;
 
    public SeriousPlayerAnimations(ModContainer container) {
       LOGGER.info("Loading up some Serious Animations.");
@@ -37,6 +38,7 @@ public class SeriousPlayerAnimations {
       SUPPLEMENTARIES_COMPAT = mods.isLoaded("supplementaries");
       IMMERSIVE_MELODIES_COMPAT = mods.isLoaded("immersive_melodies");
       SWORDBLOCKING_COMPAT = mods.isLoaded("swordblocking");
+      FANTASTICWINGS_COMPAT = mods.isLoaded("fantasticwings");
       // Fabric-only mods, never present on NeoForge
       ULTRACRAFT_COMPAT = false;
       OLDCOMBATMOD_COMPAT = false;

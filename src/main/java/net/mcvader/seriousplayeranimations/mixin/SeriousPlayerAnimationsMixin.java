@@ -23,6 +23,7 @@ import net.mcvader.seriousplayeranimations.IExampleAnimatedPlayer;
 import net.mcvader.seriousplayeranimations.SeriousPlayerAnimations;
 import net.mcvader.seriousplayeranimations.torsoPosGetter;
 import net.mcvader.seriousplayeranimations.compat.CarryOnCheck;
+import net.mcvader.seriousplayeranimations.compat.FantasticWingsCheck;
 import net.mcvader.seriousplayeranimations.compat.ImmersiveMelodiesItemCheck;
 import net.mcvader.seriousplayeranimations.compat.OldCombatModCheck;
 import net.mcvader.seriousplayeranimations.compat.SupplementariesFluteCheck;
@@ -1469,6 +1470,16 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       if (this.disableOverlayB) {
          this.disableOverlay();
          this.disableAnimationB = false;
+      }
+
+      // Fantastic Wings: don't play walking/running/item animations while flying with wings
+      if (SeriousPlayerAnimations.FANTASTICWINGS_COMPAT && FantasticWingsCheck.isFlying(this)) {
+         this.disableAnimation();
+         this.disableOverlay();
+         this.priority = Math.max(this.priority, this.prevPriority);
+         this.overlayPriority = Math.max(this.overlayPriority, this.prevOverlayPriority);
+         this.fadeTime = 5;
+         this.overlayFadeTime = 5;
       }
 
       if (!Objects.equals(this.currentAnimationId, this.prevAnimationId) && this.priority >= this.prevPriority
