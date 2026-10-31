@@ -41,6 +41,8 @@ dependencies {
     compileOnly 'maven.modrinth:sword-blocking:F2wy0XlU'
     compileOnly 'maven.modrinth:fantastic-wings:hX5hYT5c'
     compileOnly 'maven.modrinth:puzzles-lib:kmN5PWk9'
+    compileOnly 'maven.modrinth:emotecraft:fu6N0NgM'
+    compileOnly 'maven.modrinth:sword-blocking-mechanics:JwYLe1Y0'
     compileOnly sourceSets.stubs.output
 }
 

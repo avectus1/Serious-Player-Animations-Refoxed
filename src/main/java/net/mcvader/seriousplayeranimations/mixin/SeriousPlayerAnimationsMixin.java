@@ -27,6 +27,8 @@ import net.mcvader.seriousplayeranimations.IExampleAnimatedPlayer;
 import net.mcvader.seriousplayeranimations.SeriousPlayerAnimations;
 import net.mcvader.seriousplayeranimations.torsoPosGetter;
 import net.mcvader.seriousplayeranimations.compat.CarryOnCheck;
+import net.mcvader.seriousplayeranimations.compat.EmotecraftCheck;
+import net.mcvader.seriousplayeranimations.compat.SwordBlockingMechanicsCheck;
 import net.mcvader.seriousplayeranimations.compat.FantasticWingsCheck;
 import net.mcvader.seriousplayeranimations.compat.ImmersiveMelodiesItemCheck;
 import net.mcvader.seriousplayeranimations.compat.OldCombatModCheck;
@@ -318,6 +320,10 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
    private Object spa$registryMarker = null;
    @Unique
    private boolean spa$loaded = false;
+   @Unique
+   private int spa$airTicks = 0;
+   @Unique
+   private float spa$lastRunSpeed = 1.0F;
 
    @Unique
    private KeyframeAnimation spa$load(String name) {
@@ -610,6 +616,12 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       this.animate();
    }
 
+   // Arm poses added by other mods come after the vanilla ones in the enum
+   @Unique
+   private static boolean spa$isModdedPose(ArmPose pose) {
+      return pose != null && pose.ordinal() > ArmPose.BRUSH.ordinal();
+   }
+
    @Unique
    private static boolean spa$vineSide(BlockState state, BooleanProperty side) {
       return state.hasProperty(side) && state.getValue(side);
@@ -816,6 +828,29 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       } else if (!this.onGround()) {
          this.animationSpeed = this.currentAnimationId.equals("walking") ? 4.0F : 1.0F;
          this.priority = 0;
+      }
+
+      // Keep the running animation through short drops and sprint jumps instead of snapping to another pose (issue #88)
+      if (this.onGround()) {
+         this.spa$airTicks = 0;
+         if ("running".equals(this.currentAnimationId)) {
+            this.spa$lastRunSpeed = this.animationSpeed;
+         }
+      } else {
+         this.spa$airTicks++;
+         if (this.spa$airTicks <= 15
+            && "running".equals(this.prevAnimationId)
+            && this.isSprinting()
+            && !this.isPassenger()
+            && !this.isFallFlying()
+            && !this.isInWaterOrBubble()
+            && (double)this.vy >= -0.6
+            && SeriousPlayerAnimations.config.getRunning().enabled) {
+            this.currentAnimation = this.running;
+            this.currentAnimationId = "running";
+            this.animationSpeed = this.spa$lastRunSpeed;
+            this.priority = 0;
+         }
       }
 
       if (!this.onGround() && !this.isPassenger()) {
@@ -1403,6 +1438,36 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
          }
       }
 
+      // Modded arm poses (guns and other custom held items): let the other mod pose the arm
+      if (spa$isModdedPose(this.armPosMain)) {
+         if (this.armPosMain.isTwoHanded()) {
+            this.disableArms = true;
+         } else {
+            this.disableMainArmB = true;
+         }
+      }
+
+      if (spa$isModdedPose(this.armPosOff)) {
+         if (this.armPosOff.isTwoHanded()) {
+            this.disableArms = true;
+         } else {
+            this.disableOffArmB = true;
+         }
+      }
+
+      // Sword Blocking Mechanics: free the blocking arm completely so its blocking pose shows
+      if (SeriousPlayerAnimations.SWORDBLOCKINGMECHANICS_COMPAT && SwordBlockingMechanicsCheck.isBlocking(this)) {
+         this.disableOverlay();
+         if (this.getUsedItemHand() == this.rightHand) {
+            this.disableRightArm();
+            this.disableRightArmOverlayPos();
+         } else {
+            this.disableLeftArm();
+            this.disableLeftArmOverlayPos();
+         }
+         this.modifyId = "sword_blocking";
+      }
+
       if (SeriousPlayerAnimations.CARRYON_COMPAT) {
          CarryOnCheck.check((AbstractClientPlayer)(Object)this);
       }
@@ -1462,8 +1527,9 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
          this.disableOverlayB = false;
       }
 
-      // Fantastic Wings: don't play walking/running/item animations while flying with wings
-      if (SeriousPlayerAnimations.FANTASTICWINGS_COMPAT && FantasticWingsCheck.isFlying(this)) {
+      // Fantastic Wings flying / Emotecraft emote: don't play our animations on top
+      if (SeriousPlayerAnimations.FANTASTICWINGS_COMPAT && FantasticWingsCheck.isFlying(this)
+         || SeriousPlayerAnimations.EMOTECRAFT_COMPAT && EmotecraftCheck.isPlayingEmote(this)) {
          this.disableAnimation();
          this.disableOverlay();
          this.priority = Math.max(this.priority, this.prevPriority);
