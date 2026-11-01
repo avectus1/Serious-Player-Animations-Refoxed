@@ -12,6 +12,8 @@ import me.shedaniel.autoconfig.annotation.ConfigEntry.Gui.Tooltip;
 public class ClientConfig implements ConfigData {
    @Tooltip
    public float animationSpeedMultiplier = 1.0F;
+   @Tooltip
+   public boolean breathing = true;
    @Category("Animations")
    @CollapsibleObject
    public ClientConfig.AnimationConfig idleStanding = new ClientConfig.AnimationConfig();

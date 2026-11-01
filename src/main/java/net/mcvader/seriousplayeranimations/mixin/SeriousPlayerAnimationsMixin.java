@@ -20,6 +20,7 @@ import dev.kosmx.playerAnim.minecraftApi.PlayerAnimationAccess;
 import dev.kosmx.playerAnim.minecraftApi.PlayerAnimationRegistry;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.Optional;
@@ -358,11 +359,12 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       }
    }
 
-   // kind: 0 right arm rotation, 1 left arm rotation, 2 both arms rotation, 3 right arm position, 4 left arm position
+   // kind: 0 right arm rotation, 1 left arm rotation, 2 both arms rotation, 3 right arm position, 4 left arm position,
+   // 5 no breathing (head/torso/arms keep their starting height)
    @Unique
    private static KeyframeAnimation spa$masked(KeyframeAnimation src, int kind) {
       if (src == null) return null;
-      KeyframeAnimation[] variants = SPA_MASK_CACHE.computeIfAbsent(src, k -> new KeyframeAnimation[5]);
+      KeyframeAnimation[] variants = SPA_MASK_CACHE.computeIfAbsent(src, k -> new KeyframeAnimation[6]);
       KeyframeAnimation result = variants[kind];
       if (result == null) {
          AnimationBuilder b = src.mutableCopy();
@@ -387,6 +389,14 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
             leftArm.x.setEnabled(false);
             leftArm.y.setEnabled(false);
             leftArm.z.setEnabled(false);
+         }
+         if (kind == 5) {
+            for (String partName : new String[]{"head", "torso", "rightArm", "leftArm"}) {
+               StateCollection part = b.getPart(partName);
+               if (part != null) {
+                  spa$flatten(part.y);
+               }
+            }
          }
          result = b.build();
          variants[kind] = result;
@@ -615,6 +625,18 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
    )
    public void tick(CallbackInfo ci) {
       this.animate();
+   }
+
+   // Holds a value at its first keyframe for the whole animation
+   @Unique
+   private static void spa$flatten(StateCollection.State state) {
+      List<KeyframeAnimation.KeyFrame> frames = state.getKeyFrames();
+      if (frames.size() < 2) return;
+      float first = frames.get(0).value;
+      for (int i = 0; i < frames.size(); i++) {
+         KeyframeAnimation.KeyFrame frame = frames.get(i);
+         state.replace(new KeyframeAnimation.KeyFrame(frame.tick, first, frame.ease, frame.easingArg), i);
+      }
    }
 
    // Arm poses added by other mods come after the vanilla ones in the enum
@@ -1553,6 +1575,13 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
          this.overlayPriority = Math.max(this.overlayPriority, this.prevOverlayPriority);
          this.fadeTime = 5;
          this.overlayFadeTime = 5;
+      }
+
+      // Breathing option (issue #102): stop the idle up-and-down torso movement
+      if (!SeriousPlayerAnimations.config.breathing
+         && ("idle_standing".equals(this.currentAnimationId) || "idle_sneak".equals(this.currentAnimationId))) {
+         this.currentAnimation = spa$masked(this.currentAnimation, 5);
+         this.modifyId = this.modifyId + "_nobreath";
       }
 
       if (!Objects.equals(this.currentAnimationId, this.prevAnimationId) && this.priority >= this.prevPriority

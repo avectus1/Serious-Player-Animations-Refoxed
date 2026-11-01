@@ -3,6 +3,8 @@
 
   "text.autoconfig.seriousplayeranimations.option.client.animationSpeedMultiplier" : "Global Animation Speed Multiplier",
   "text.autoconfig.seriousplayeranimations.option.client.animationSpeedMultiplier.@Tooltip" : "Changes the animation speed multiplier for all animations",
+  "text.autoconfig.seriousplayeranimations.option.client.breathing" : "Breathing",
+  "text.autoconfig.seriousplayeranimations.option.client.breathing.@Tooltip" : "Small up and down torso movement while standing or sneaking still. Turn off if backpacks or modded armor look wrong",
 
   "text.autoconfig.seriousplayeranimations.option.client.idleStanding" : "Idle Standing",
   "text.autoconfig.seriousplayeranimations.option.client.idleStanding.enabled" : "Enabled",
