@@ -29,4 +29,4 @@ El jar queda en `build/libs/`.
 
 ### Créditos y licencia
 
-Todas las animaciones y el código original son de **McVader** ([repo original](https://github.com/McVader34/Serious-Player-Animations)). Este port no está afiliado ni respaldado por el autor original. Licencia MIT — ver [LICENSE](LICENSE).
+Todas las animaciones y el código original son de **McVader** ([repo original](https://github.com/McVader34/Serious-Player-Animations)). Este port no está afiliado ni respaldado por el autor original. Licencia MIT - ver [LICENSE](LICENSE).
