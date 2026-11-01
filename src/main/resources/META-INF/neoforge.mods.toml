@@ -5,7 +5,7 @@ issueTrackerURL="https://github.com/McVader34/Serious-Player-Animations/issues"
 
 [[mods]]
 modId="seriousplayeranimations"
-version="1.3.5-neoforge"
+version="1.4.0-neoforge"
 displayName="Serious Player Animations"
 authors="McVader (NeoForge port)"
 description='''A client side mod that adds cool animations to the player.'''
