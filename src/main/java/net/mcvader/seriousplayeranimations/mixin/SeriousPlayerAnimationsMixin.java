@@ -26,6 +26,7 @@ import java.util.Optional;
 import net.mcvader.seriousplayeranimations.IExampleAnimatedPlayer;
 import net.mcvader.seriousplayeranimations.SeriousPlayerAnimations;
 import net.mcvader.seriousplayeranimations.torsoPosGetter;
+import net.mcvader.seriousplayeranimations.compat.ArtifactsUmbrellaCheck;
 import net.mcvader.seriousplayeranimations.compat.CarryOnCheck;
 import net.mcvader.seriousplayeranimations.compat.EmotecraftCheck;
 import net.mcvader.seriousplayeranimations.compat.SwordBlockingMechanicsCheck;
@@ -1466,6 +1467,22 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
             this.disableLeftArmOverlayPos();
          }
          this.modifyId = "sword_blocking";
+      }
+
+      // Artifacts umbrella: keep the arm raised while holding the umbrella upright
+      if (SeriousPlayerAnimations.ARTIFACTS_COMPAT) {
+         for (InteractionHand hand : InteractionHand.values()) {
+            if (ArtifactsUmbrellaCheck.isHoldingUpright(this, hand)) {
+               if (hand == this.rightHand) {
+                  this.disableRightArm();
+                  this.disableRightArmOverlayPos();
+               } else {
+                  this.disableLeftArm();
+                  this.disableLeftArmOverlayPos();
+               }
+               this.modifyId = this.modifyId + "umbrella_" + hand.name();
+            }
+         }
       }
 
       if (SeriousPlayerAnimations.CARRYON_COMPAT) {
