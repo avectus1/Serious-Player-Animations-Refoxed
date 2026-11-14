@@ -3,7 +3,7 @@ plugins {
     id 'net.neoforged.moddev' version '2.0.148'
 }
 
-version = '1.4.5-neoforge'
+version = '1.5.0-neoforge'
 group = 'net.mcvader.seriousplayeranimations'
 base { archivesName = 'seriousplayeranimations' }
 
@@ -44,6 +44,7 @@ dependencies {
     compileOnly 'maven.modrinth:emotecraft:fu6N0NgM'
     compileOnly 'maven.modrinth:sword-blocking-mechanics:JwYLe1Y0'
     compileOnly 'maven.modrinth:artifacts:lMfuK0o7'
+    compileOnly 'maven.modrinth:exposure:tjX0GpFW'
     compileOnly sourceSets.stubs.output
 }
 

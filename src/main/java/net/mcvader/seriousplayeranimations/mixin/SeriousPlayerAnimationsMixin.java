@@ -30,6 +30,7 @@ import net.mcvader.seriousplayeranimations.torsoPosGetter;
 import net.mcvader.seriousplayeranimations.compat.ArtifactsUmbrellaCheck;
 import net.mcvader.seriousplayeranimations.compat.CarryOnCheck;
 import net.mcvader.seriousplayeranimations.compat.EmotecraftCheck;
+import net.mcvader.seriousplayeranimations.compat.ExposureCheck;
 import net.mcvader.seriousplayeranimations.compat.SwordBlockingMechanicsCheck;
 import net.mcvader.seriousplayeranimations.compat.FantasticWingsCheck;
 import net.mcvader.seriousplayeranimations.compat.ImmersiveMelodiesItemCheck;
@@ -56,6 +57,9 @@ import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.PickaxeItem;
 import net.minecraft.world.item.ShieldItem;
+import net.neoforged.neoforge.common.ItemAbilities;
+import net.minecraft.world.item.UseAnim;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ShovelItem;
 import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.TridentItem;
@@ -637,6 +641,23 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
          KeyframeAnimation.KeyFrame frame = frames.get(i);
          state.replace(new KeyframeAnimation.KeyFrame(frame.tick, first, frame.ease, frame.easingArg), i);
       }
+   }
+
+   // Leaves one arm (rotation and position) to vanilla and other mods
+   @Unique
+   private void spa$freeArm(boolean right) {
+      if (right) {
+         this.disableRightArm();
+         this.disableRightArmOverlayPos();
+      } else {
+         this.disableLeftArm();
+         this.disableLeftArmOverlayPos();
+      }
+   }
+
+   @Unique
+   private static boolean spa$isStarcatcherPose(ArmPose pose) {
+      return pose != null && pose.name().startsWith("STARCATCHER_");
    }
 
    // Arm poses added by other mods come after the vanilla ones in the enum
@@ -1224,8 +1245,10 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       }
 
       if (this.isUsingItem()) {
-         this.activeItem = this.getUseItem().getItem();
-         if (this.activeItem.components().has(DataComponents.FOOD)) {
+         ItemStack useStack = this.getUseItem();
+         UseAnim useAnim = useStack.getUseAnimation();
+         this.activeItem = useStack.getItem();
+         if (useStack.has(DataComponents.FOOD)) {
             if (SeriousPlayerAnimations.config.getEating().enabled) {
                this.overlayFadeTime = 9;
                this.overlayAnimationSpeed = 1.0F * SeriousPlayerAnimations.config.getEating().speedMultiplier;
@@ -1251,7 +1274,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
 
             this.fadeTime = 1;
             this.priority = 0;
-         } else if (this.activeItem instanceof TridentItem) {
+         } else if (this.activeItem instanceof TridentItem || useAnim == UseAnim.SPEAR) {
             if (SeriousPlayerAnimations.config.getTrident().enabled) {
                this.overlayFadeTime = 5;
                this.overlayAnimationSpeed = SeriousPlayerAnimations.config.getTrident().speedMultiplier;
@@ -1289,7 +1312,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
                this.priority = 0;
                this.fadeTime = 1;
             }
-         } else if (this.activeItem instanceof BrushItem) {
+         } else if (this.activeItem instanceof BrushItem || useAnim == UseAnim.BRUSH) {
             if (this.getUsedItemHand().equals(InteractionHand.MAIN_HAND)) {
                this.disableMainArmB = true;
             } else {
@@ -1297,7 +1320,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
             }
 
             this.priority = 0;
-         } else if (this.activeItem instanceof InstrumentItem) {
+         } else if (this.activeItem instanceof InstrumentItem || useAnim == UseAnim.TOOT_HORN) {
             if (this.getUsedItemHand().equals(InteractionHand.MAIN_HAND)) {
                this.disableMainArmB = true;
             } else {
@@ -1306,7 +1329,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
 
             this.fadeTime = 1;
             this.priority = 0;
-         } else if (this.activeItem instanceof BowItem) {
+         } else if (this.activeItem instanceof BowItem || useAnim == UseAnim.BOW) {
             if (!this.isPassenger() && !this.isVisuallyCrawling() && SeriousPlayerAnimations.config.getBow().enabled) {
                this.overlayFadeTime = 6;
                this.overlayAnimationSpeed = 1.0F * SeriousPlayerAnimations.config.getBow().speedMultiplier;
@@ -1346,7 +1369,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
                this.modifyId = "bow_idle";
                this.fadeTime = 1;
             }
-         } else if (this.activeItem instanceof ShieldItem) {
+         } else if (this.activeItem instanceof ShieldItem || useStack.canPerformAction(ItemAbilities.SHIELD_BLOCK)) {
             if (SeriousPlayerAnimations.config.getShield().enabled) {
                this.overlayFadeTime = 5;
                this.overlayAnimationSpeed = SeriousPlayerAnimations.config.getShield().speedMultiplier;
@@ -1384,7 +1407,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
                this.priority = 0;
                this.fadeTime = 1;
             }
-         } else if (this.activeItem instanceof CrossbowItem) {
+         } else if (this.activeItem instanceof CrossbowItem || useAnim == UseAnim.CROSSBOW) {
             this.disableArms = true;
          } else if (SeriousPlayerAnimations.SUPPLEMENTARIES_COMPAT && SupplementariesFluteCheck.check(this.activeItem)) {
             this.disableArms = true;
@@ -1462,20 +1485,40 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       }
 
       // Modded arm poses (guns and other custom held items): let the other mod pose the arm
-      if (spa$isModdedPose(this.armPosMain)) {
-         if (this.armPosMain.isTwoHanded()) {
-            this.disableArms = true;
-         } else {
-            this.disableMainArmB = true;
+      if (spa$isStarcatcherPose(this.armPosMain) || spa$isStarcatcherPose(this.armPosOff)) {
+         // Starcatcher: holding a fish above the head can raise both arms
+         this.disableOverlay();
+         this.spa$freeArm(true);
+         this.spa$freeArm(false);
+         this.modifyId = this.modifyId + "starcatcher";
+      } else {
+         if (spa$isModdedPose(this.armPosMain)) {
+            if (this.armPosMain.isTwoHanded()) {
+               this.spa$freeArm(true);
+               this.spa$freeArm(false);
+            } else {
+               this.spa$freeArm(this.rightHand == InteractionHand.MAIN_HAND);
+            }
+            this.modifyId = this.modifyId + "modpose_main";
+         }
+
+         if (spa$isModdedPose(this.armPosOff)) {
+            if (this.armPosOff.isTwoHanded()) {
+               this.spa$freeArm(true);
+               this.spa$freeArm(false);
+            } else {
+               this.spa$freeArm(this.rightHand == InteractionHand.OFF_HAND);
+            }
+            this.modifyId = this.modifyId + "modpose_off";
          }
       }
 
-      if (spa$isModdedPose(this.armPosOff)) {
-         if (this.armPosOff.isTwoHanded()) {
-            this.disableArms = true;
-         } else {
-            this.disableOffArmB = true;
-         }
+      // Exposure: camera held up, in selfie mode, on a stand or disassembled
+      if (SeriousPlayerAnimations.EXPOSURE_COMPAT && ExposureCheck.isPosingWithCamera(this)) {
+         this.disableOverlay();
+         this.spa$freeArm(true);
+         this.spa$freeArm(false);
+         this.modifyId = this.modifyId + "exposure";
       }
 
       // Sword Blocking Mechanics: free the blocking arm completely so its blocking pose shows
