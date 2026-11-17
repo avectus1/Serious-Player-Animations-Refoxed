@@ -31,6 +31,8 @@ public class SeriousPlayerAnimations {
    public static boolean SWORDBLOCKINGMECHANICS_COMPAT;
    public static boolean ARTIFACTS_COMPAT;
    public static boolean EXPOSURE_COMPAT;
+   public static boolean CLIMBABLEROPES_COMPAT;
+   public static boolean FIREFIGHTING_COMPAT;
 
    public SeriousPlayerAnimations(ModContainer container) {
       LOGGER.info("Loading up some Serious Animations.");
@@ -47,6 +49,8 @@ public class SeriousPlayerAnimations {
       SWORDBLOCKINGMECHANICS_COMPAT = mods.isLoaded("swordblockingmechanics");
       ARTIFACTS_COMPAT = mods.isLoaded("artifacts");
       EXPOSURE_COMPAT = mods.isLoaded("exposure");
+      CLIMBABLEROPES_COMPAT = mods.isLoaded("climbable_ropes");
+      FIREFIGHTING_COMPAT = mods.isLoaded("createfirefightingadd");
       // Fabric-only mods, never present on NeoForge
       ULTRACRAFT_COMPAT = false;
       OLDCOMBATMOD_COMPAT = false;

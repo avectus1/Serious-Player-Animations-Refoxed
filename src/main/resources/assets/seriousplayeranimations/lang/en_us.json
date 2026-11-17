@@ -3,12 +3,14 @@
 
   "text.autoconfig.seriousplayeranimations.option.client.animationSpeedMultiplier" : "Global Animation Speed Multiplier",
   "text.autoconfig.seriousplayeranimations.option.client.animationSpeedMultiplier.@Tooltip" : "Changes the animation speed multiplier for all animations",
-  "text.autoconfig.seriousplayeranimations.option.client.breathing" : "Breathing",
-  "text.autoconfig.seriousplayeranimations.option.client.breathing.@Tooltip" : "Small up and down torso movement while standing or sneaking still. Turn off if backpacks or modded armor look wrong",
 
   "text.autoconfig.seriousplayeranimations.option.client.idleStanding" : "Idle Standing",
   "text.autoconfig.seriousplayeranimations.option.client.idleStanding.enabled" : "Enabled",
   "text.autoconfig.seriousplayeranimations.option.client.idleStanding.speedMultiplier" : "Speed Multiplier",
+
+  "text.autoconfig.seriousplayeranimations.option.client.idleBreathing" : "Breathing",
+  "text.autoconfig.seriousplayeranimations.option.client.idleBreathing.enabled" : "Enabled",
+  "text.autoconfig.seriousplayeranimations.option.client.idleBreathing.speedMultiplier" : "Speed Multiplier",
 
   "text.autoconfig.seriousplayeranimations.option.client.walking" : "Walking",
   "text.autoconfig.seriousplayeranimations.option.client.walking.enabled" : "Enabled",
@@ -41,6 +43,8 @@
   "text.autoconfig.seriousplayeranimations.option.client.idleCreativeFlying" : "Idle Creative Flying",
   "text.autoconfig.seriousplayeranimations.option.client.idleCreativeFlying.enabled" : "Enabled",
   "text.autoconfig.seriousplayeranimations.option.client.idleCreativeFlying.speedMultiplier" : "Speed Multiplier",
+  "text.autoconfig.seriousplayeranimations.option.client.idleCreativeFlying.minHeightAboveGround" : "Min Height Above Ground",
+  "text.autoconfig.seriousplayeranimations.option.client.idleCreativeFlying.minHeightAboveGround.@Tooltip" : "Blocks of air needed below the player before the flying animation plays. 0 turns this off",
 
   "text.autoconfig.seriousplayeranimations.option.client.falling" : "Falling",
   "text.autoconfig.seriousplayeranimations.option.client.falling.enabled" : "Enabled",

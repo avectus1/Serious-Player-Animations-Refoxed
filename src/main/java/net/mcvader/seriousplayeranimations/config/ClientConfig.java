@@ -12,11 +12,11 @@ import me.shedaniel.autoconfig.annotation.ConfigEntry.Gui.Tooltip;
 public class ClientConfig implements ConfigData {
    @Tooltip
    public float animationSpeedMultiplier = 1.0F;
-   @Tooltip
-   public boolean breathing = true;
    @Category("Animations")
    @CollapsibleObject
    public ClientConfig.AnimationConfig idleStanding = new ClientConfig.AnimationConfig();
+   @CollapsibleObject
+   public ClientConfig.AnimationConfig idleBreathing = new ClientConfig.AnimationConfig();
    @CollapsibleObject
    public ClientConfig.AnimationConfig walking = new ClientConfig.AnimationConfig();
    @CollapsibleObject
@@ -32,7 +32,7 @@ public class ClientConfig implements ConfigData {
    @CollapsibleObject
    public ClientConfig.AnimationConfig walkingSneakBackwards = new ClientConfig.AnimationConfig();
    @CollapsibleObject
-   public ClientConfig.AnimationConfig idleCreativeFlying = new ClientConfig.AnimationConfig();
+   public ClientConfig.FlyingAnimationConfig idleCreativeFlying = new ClientConfig.FlyingAnimationConfig();
    @CollapsibleObject
    public ClientConfig.AnimationConfig falling = new ClientConfig.AnimationConfig();
    @CollapsibleObject
@@ -114,7 +114,11 @@ public class ClientConfig implements ConfigData {
       return this.walkingSneakBackwards;
    }
 
-   public ClientConfig.AnimationConfig getIdleCreativeFlying() {
+   public ClientConfig.AnimationConfig getBreathing() {
+      return this.idleBreathing;
+   }
+
+   public ClientConfig.FlyingAnimationConfig getIdleCreativeFlying() {
       return this.idleCreativeFlying;
    }
 
@@ -217,6 +221,13 @@ public class ClientConfig implements ConfigData {
    public static class AnimationConfig {
       public boolean enabled = true;
       public float speedMultiplier = 1.0F;
+   }
+
+   public static class FlyingAnimationConfig {
+      public boolean enabled = true;
+      public float speedMultiplier = 1.0F;
+      @Tooltip
+      public int minHeightAboveGround = 0;
    }
 
    public static class TestConfig {

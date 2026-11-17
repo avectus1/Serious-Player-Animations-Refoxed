@@ -88,6 +88,10 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.client.model.HumanoidModel.ArmPose;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import net.mcvader.seriousplayeranimations.compat.ClimbableRopesCheck;
+import net.mcvader.seriousplayeranimations.compat.ExtensionLadderCheck;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -667,6 +671,72 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
    }
 
    @Unique
+   private Float spa$extensionLadderYaw = null;
+
+   // Body poses a player normally has. Anything else (a vanilla mob pose like SITTING or SLIDING,
+   // or a pose added by a mod) is set by another mod that draws the player itself.
+   @Unique
+   private static boolean spa$isCustomBodyPose(Pose pose) {
+      if (pose == null) return false;
+      return switch (pose) {
+         case STANDING, FALL_FLYING, SLEEPING, SWIMMING, SPIN_ATTACK, CROUCHING, DYING -> false;
+         default -> true;
+      };
+   }
+
+   // On the ground, or standing/walking on an extension ladder (it has no collision, the mod holds the player up)
+   @Unique
+   private boolean spa$grounded() {
+      return this.onGround() || this.spa$extensionLadderYaw != null && this.spa$extensionLadderYaw.isNaN();
+   }
+
+   // On an extension ladder or a rope from a compat mod (not a climbable block)
+   @Unique
+   private boolean spa$isHangingOnModdedClimbable() {
+      return SeriousPlayerAnimations.CLIMBABLEROPES_COMPAT && ClimbableRopesCheck.isOnRope(this)
+         || this.spa$extensionLadderYaw != null;
+   }
+
+   // Flying animation only with at least minHeightAboveGround blocks of air below the player
+   @Unique
+   private boolean spa$highEnoughToFly() {
+      int height = SeriousPlayerAnimations.config.getIdleCreativeFlying().minHeightAboveGround;
+      if (height <= 0) return true;
+      return this.clientLevel.noCollision(this, this.getBoundingBox().expandTowards(0.0, -(double)height, 0.0))
+         && !this.clientLevel.containsAnyLiquid(this.getBoundingBox().expandTowards(0.0, -(double)height, 0.0));
+   }
+
+   // Turns the body to face what is being climbed and keeps the head within 90 degrees of it
+   @Unique
+   private void spa$faceClimb(float yaw) {
+      this.byaw = (yaw % 360.0F + 360.0F) % 360.0F;
+      this.hyaw = (this.getYHeadRot() % 360.0F + 360.0F) % 360.0F;
+      this.setYBodyRot(this.byaw);
+      this.hyaw = this.hyaw - this.byaw;
+      this.hyaw = (this.hyaw % 360.0F + 360.0F) % 360.0F;
+      if (this.hyaw > 90.0F && this.hyaw <= 180.0F) {
+         this.setYHeadRot(this.byaw + 90.0F);
+      } else if (this.hyaw > 180.0F && this.hyaw < 270.0F) {
+         this.setYHeadRot(this.byaw + 270.0F);
+      }
+   }
+
+   // Climbing up, down or holding still
+   @Unique
+   private void spa$pickClimbAnimation(boolean climbing) {
+      if (climbing && this.vy > 0.0F) {
+         this.currentAnimation = this.crouched ? this.climbing_sneak : this.climbing;
+         this.currentAnimationId = this.crouched ? "climbing_sneak" : "climbing";
+      } else if (climbing && this.vy < 0.0F) {
+         this.currentAnimation = this.climbing_backwards;
+         this.currentAnimationId = "climbing_backwards";
+      } else {
+         this.currentAnimation = this.crouched ? this.idle_climbing_sneak : this.idle_climbing;
+         this.currentAnimationId = this.crouched ? "idle_climbing_sneak" : "idle_climbing";
+      }
+   }
+
+   @Unique
    private static boolean spa$vineSide(BlockState state, BooleanProperty side) {
       return state.hasProperty(side) && state.getValue(side);
    }
@@ -701,6 +771,8 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       this.overlayAnimationSpeed = 1.0F;
       this.overlayPriority = 0;
       this.crouched = this.isCrouching();
+      this.spa$extensionLadderYaw = SeriousPlayerAnimations.FIREFIGHTING_COMPAT && !this.isPassenger()
+         ? ExtensionLadderCheck.ladderState(this) : null;
       if (this.moveSpeed < 0.23 && this.moveSpeed > 0.0 && !this.isMovingBackwards && !this.crouched) {
          if (40.90909090909091 * this.moveSpeed > 1.0) {
             this.animationSpeed = (float)(40.90909090909091 * this.moveSpeed * (double)SeriousPlayerAnimations.config.getWalking().speedMultiplier);
@@ -777,7 +849,8 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
                this.fadeTime = 1;
             }
 
-            this.animationSpeed = SeriousPlayerAnimations.config.getIdleStanding().speedMultiplier;
+            this.animationSpeed = SeriousPlayerAnimations.config.getIdleStanding().speedMultiplier
+               * SeriousPlayerAnimations.config.getBreathing().speedMultiplier;
             this.priority = 0;
          }
       } else if (this.crouched && this.moveSpeed == 0.0 && !this.isMovingBackwards) {
@@ -787,7 +860,8 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
             this.disableAnimation();
          }
 
-         this.animationSpeed = 1.0F * SeriousPlayerAnimations.config.getIdleSneaking().speedMultiplier;
+         this.animationSpeed = 1.0F * SeriousPlayerAnimations.config.getIdleSneaking().speedMultiplier
+            * SeriousPlayerAnimations.config.getBreathing().speedMultiplier;
          if (!this.prevAnimationId.equals("walking_sneak") && !this.prevAnimationId.equals("walking_sneak_backwards")) {
             this.fadeTime = 1;
          } else {
@@ -835,7 +909,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
          this.priority = 0;
       }
 
-      if (this.vy > 0.0F && !this.onGround()) {
+      if (this.vy > 0.0F && !this.spa$grounded()) {
          this.animationSpeed = this.currentAnimationId.equals("walking") ? 4.0F : 1.0F;
          this.priority = 0;
       }
@@ -847,7 +921,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
          this.flychecker = 0;
       }
 
-      if (this.flychecker > 10) {
+      if (this.flychecker > 10 && !this.onClimbable() && !this.spa$isHangingOnModdedClimbable() && this.spa$highEnoughToFly()) {
          this.currentAnimation = this.idle_creative_flying;
          this.currentAnimationId = "idle_creative_flying";
          if (!SeriousPlayerAnimations.config.getIdleCreativeFlying().enabled) {
@@ -859,7 +933,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
          this.priority = 0;
       }
 
-      if ((double)this.vy < -0.6 && !this.isPassenger() && !this.onGround()) {
+      if ((double)this.vy < -0.6 && !this.isPassenger() && !this.onGround() && !this.spa$isHangingOnModdedClimbable()) {
          this.currentAnimation = this.falling;
          this.currentAnimationId = "falling";
          if (!SeriousPlayerAnimations.config.getFalling().enabled) {
@@ -869,13 +943,13 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
          this.fadeTime = 8;
          this.animationSpeed = 1.0F * SeriousPlayerAnimations.config.getFalling().speedMultiplier;
          this.priority = 0;
-      } else if (!this.onGround()) {
+      } else if (!this.spa$grounded()) {
          this.animationSpeed = this.currentAnimationId.equals("walking") ? 4.0F : 1.0F;
          this.priority = 0;
       }
 
       // Keep the running animation through short drops and sprint jumps instead of snapping to another pose (issue #88)
-      if (this.onGround()) {
+      if (this.spa$grounded()) {
          this.spa$airTicks = 0;
          if ("running".equals(this.currentAnimationId)) {
             this.spa$lastRunSpeed = this.animationSpeed;
@@ -900,7 +974,25 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       if (!this.onGround() && !this.isPassenger()) {
          BlockState climbState = this.clientLevel.getBlockState(this.blockPosition());
          Block block = climbState.getBlock();
-         if (block instanceof LadderBlock || block instanceof VineBlock) {
+         Float extensionLadderYaw = this.spa$extensionLadderYaw;
+         if (extensionLadderYaw != null && extensionLadderYaw.isNaN()) {
+            // Held up by an extension ladder without climbing it (standing on top): keep the ground animations
+         } else if (extensionLadderYaw != null) {
+            // Create: FireFighting Additions extension ladder: climb facing the ladder
+            this.animationSpeed = 3.0F * SeriousPlayerAnimations.config.getClimbing().speedMultiplier;
+            this.fadeTime = 7;
+            this.priority = 0;
+            if (!(this.getUseItem().getItem() instanceof BowItem)) {
+               this.spa$faceClimb(extensionLadderYaw);
+            }
+            this.spa$pickClimbAnimation(true);
+         } else if (SeriousPlayerAnimations.CLIMBABLEROPES_COMPAT && ClimbableRopesCheck.isOnRope(this)) {
+            // Climbable Ropes: climb animation on the rope (its own pose replaces it when it has one, see below)
+            this.animationSpeed = 3.0F * SeriousPlayerAnimations.config.getClimbing().speedMultiplier;
+            this.fadeTime = 7;
+            this.priority = 0;
+            this.spa$pickClimbAnimation(true);
+         } else if (block instanceof LadderBlock || block instanceof VineBlock) {
             this.animationSpeed = 3.0F * SeriousPlayerAnimations.config.getClimbing().speedMultiplier;
             this.fadeTime = 7;
             this.priority = 0;
@@ -992,6 +1084,26 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
                this.currentAnimation = this.crouched ? this.idle_climbing_sneak : this.idle_climbing;
                this.currentAnimationId = this.crouched ? "idle_climbing_sneak" : "idle_climbing";
             }
+         } else if (!(block instanceof PowderSnowBlock) && this.onClimbable()) {
+            // Ladders, ropes and vines from other mods (anything the game lets you climb)
+            this.animationSpeed = 3.0F * SeriousPlayerAnimations.config.getClimbing().speedMultiplier;
+            this.fadeTime = 7;
+            this.priority = 0;
+            if (!(this.getUseItem().getItem() instanceof BowItem)) {
+               if (climbState.hasProperty(HorizontalDirectionalBlock.FACING)) {
+                  // Same as a vanilla ladder: face the wall it hangs on
+                  this.spa$faceClimb(climbState.getValue(HorizontalDirectionalBlock.FACING).getOpposite().toYRot());
+               } else {
+                  // Same as scaffolding: face the middle of the block
+                  this.spa$faceClimb((float)Math.toDegrees(
+                        Math.atan2(
+                           (double)this.blockPosition().getZ() + 0.5 - this.pos.z,
+                           (double)this.blockPosition().getX() + 0.5 - this.pos.x
+                        )
+                     ) - 90.0F);
+               }
+            }
+            this.spa$pickClimbAnimation(true);
          } else if (block instanceof PowderSnowBlock) {
             this.fadeTime = 7;
             this.priority = 0;
@@ -1610,8 +1722,11 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       }
 
       // Fantastic Wings flying / Emotecraft emote: don't play our animations on top
+      // Climbable Ropes pose on a rope / custom body poses from other mods (sitting, sliding, modded poses)
       if (SeriousPlayerAnimations.FANTASTICWINGS_COMPAT && FantasticWingsCheck.isFlying(this)
-         || SeriousPlayerAnimations.EMOTECRAFT_COMPAT && EmotecraftCheck.isPlayingEmote(this)) {
+         || SeriousPlayerAnimations.EMOTECRAFT_COMPAT && EmotecraftCheck.isPlayingEmote(this)
+         || SeriousPlayerAnimations.CLIMBABLEROPES_COMPAT && ClimbableRopesCheck.hasCustomPose(this)
+         || spa$isCustomBodyPose(this.getPose())) {
          this.disableAnimation();
          this.disableOverlay();
          this.priority = Math.max(this.priority, this.prevPriority);
@@ -1621,7 +1736,7 @@ public abstract class SeriousPlayerAnimationsMixin extends Player implements IEx
       }
 
       // Breathing option (issue #102): stop the idle up-and-down torso movement
-      if (!SeriousPlayerAnimations.config.breathing
+      if (!SeriousPlayerAnimations.config.getBreathing().enabled
          && ("idle_standing".equals(this.currentAnimationId) || "idle_sneak".equals(this.currentAnimationId))) {
          this.currentAnimation = spa$masked(this.currentAnimation, 5);
          this.modifyId = this.modifyId + "_nobreath";

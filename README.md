@@ -13,9 +13,9 @@ Port no oficial a NeoForge 1.21.1 de [Serious Player Animations](https://github.
 ### Notas
 
 - **Solo cliente.** No hace nada en servidores y no te impide entrar a uno.
-- **Configuración:** menú Mods - Serious Player Animations - Config. Ahí puedes apagar la **respiración** (el movimiento del torso al estar quieto) si mochilas o armaduras de mods se ven mal.
+- **Configuración:** menú Mods - Serious Player Animations - Config, con el mismo diseño que el original. En la pestaña de animaciones, **Breathing** (respiración) se puede apagar o cambiar de velocidad como cualquier otra animación, y **Idle Creative Flying** tiene una altura mínima sobre el suelo para la animación de vuelo.
 - **Resource packs** hechos para Serious Player Animations funcionan. Las animaciones se cargan al entrar al mundo, así que vuelve a entrar después de cambiar packs.
-- **Compatibilidad:** Not Enough Animations, Carry On, Supplementaries (flauta), Immersive Melodies, Sword Blocking, **Fantastic Wings**, **Emotecraft**, **Sword Blocking Mechanics**, el paraguas de **Artifacts**, las cámaras de **Exposure**, los peces de **Starcatcher** y los escudos de **L_Ender's Cataclysm** (y otros escudos de mods), además de mods de armas y otros mods que usan poses de brazo propias.
+- **Compatibilidad:** Not Enough Animations, Carry On, Supplementaries (flauta), Immersive Melodies, Sword Blocking, **Fantastic Wings**, **Emotecraft**, **Sword Blocking Mechanics**, el paraguas de **Artifacts**, las cámaras de **Exposure**, los peces de **Starcatcher** y los escudos de **L_Ender's Cataclysm** (y otros escudos de mods), las cuerdas de **Climbable Ropes for Create Aeronautics**, las escaleras extensibles de **Create: FireFighting Additions**, escaleras y cuerdas de otros mods, poses de cuerpo de otros mods (sentarse, deslizarse, etc.), además de mods de armas y otros mods que usan poses de brazo propias.
 - **Compatibilidad eliminada:** Ultracraft, Old Combat Mod y Trigger Happy (solo existen en Fabric). Paraglider no tiene versión NeoForge 1.21.1.
 - Basado en la versión alpha 1.2.0 de Fabric, así que puede tener los mismos fallos que esa alpha.
 
